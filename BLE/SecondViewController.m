@@ -7,6 +7,8 @@
 //
 
 #import "SecondViewController.h"
+#import <CoreBluetooth/CoreBluetooth.h>
+#import "TransferService.h"
 
 @interface SecondViewController ()
 

@@ -24,4 +24,7 @@
     // Dispose of any resources that can be recreated.
 }
 
+- (IBAction)JumpToSecondTab:(id)sender {
+    [(UITabBarController *) self.tabBarController setSelectedIndex:1];
+}
 @end

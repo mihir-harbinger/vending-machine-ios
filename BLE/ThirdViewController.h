@@ -1,5 +1,5 @@
 //
-//  FirstViewController.h
+//  ThirdViewController.h
 //  BLE
 //
 //  Created by Mihir Karandikar on 5/16/16.
@@ -8,9 +8,7 @@
 
 #import <UIKit/UIKit.h>
 
-@interface FirstViewController : UIViewController
-
-
+@interface ThirdViewController : UIViewController
+- (IBAction)JumpToFirstView:(id)sender;
 
 @end
-
