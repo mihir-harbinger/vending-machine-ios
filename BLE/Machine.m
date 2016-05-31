@@ -22,12 +22,18 @@
 #define NOTIFY_MTU      20
 
 @implementation Machine
+
+
+
 - (void)viewDidLoad
 {
     [super viewDidLoad];
     
     // Start up the CBPeripheralManager
     _peripheralManager = [[CBPeripheralManager alloc] initWithDelegate:self queue:nil];
+    _myArray = @[@"Green Tea", @"Black Coffee", @"Lemonade", @"Hot Water"];
+    _cmdSequence = @[@"Dispensing Coffee...", @"Order served!"];
+    _counter = 0, _cmdCounter = [NSNumber numberWithInt:99];
 }
 
 
@@ -76,17 +82,21 @@
 - (void)peripheralManager:(CBPeripheralManager *)peripheral central:(CBCentral *)central didSubscribeToCharacteristic:(CBCharacteristic *)characteristic
 {
     NSLog(@"Central subscribed to characteristic");
+    _counter = 0;
     [self sendCustomData];
 }
 
 -(void)sendCustomData{
-    NSArray *myArray = @[@"Green Tea", @"Black Coffee", @"Lemonade", @"Hot Water"];
     
-    // Start sending
-    for(NSString *temp in myArray){
+    BOOL didSend = YES;
+    
+    while(didSend && [_counter intValue] < [_myArray count]){
+        // Start sending
+        NSLog(@"%@", [_myArray objectAtIndex:[_counter integerValue]]);
+        
         
         // Get the data
-        self.dataToSend = [[NSString stringWithFormat: @"ITEM %@", temp] dataUsingEncoding:NSUTF8StringEncoding];
+        self.dataToSend = [[NSString stringWithFormat: @"ITEM %@", [_myArray objectAtIndex:[_counter integerValue]]] dataUsingEncoding:NSUTF8StringEncoding];
         
         // Reset the index
         self.sendDataIndex = 0;
@@ -101,25 +111,72 @@
         NSData *chunk = [NSData dataWithBytes:self.dataToSend.bytes+self.sendDataIndex length:amountToSend];
         
         // Send it
-        [self.peripheralManager updateValue:chunk forCharacteristic:self.transferCharacteristic onSubscribedCentrals:nil];
-        
+        didSend = [self.peripheralManager updateValue:chunk forCharacteristic:self.transferCharacteristic onSubscribedCentrals:nil];
+        NSLog(didSend ? @"YES" : @"NO");
+        if(didSend){
+            _counter = @([_counter intValue] + 1);
+        }
+        //[NSThread sleepForTimeInterval: 5.0];
     }
     
 }
 
-//- (void)peripheralManager:(CBPeripheralManager *)peripheral central:(CBCentral *)central didSubscribeToCharacteristic:(CBCharacteristic *)characteristic
-//{
-//    NSLog(@"Central subscribed to characteristic");
-//    
-//    // Get the data
-//    self.dataToSend = [@"Hello, central!" dataUsingEncoding:NSUTF8StringEncoding];
-//    
-//    // Reset the index
-//    self.sendDataIndex = 0;
-//    
-//    // Start sending
-//    [self sendData];
-//}
+-(void)dispenseCoffee{
+    
+    BOOL didSend = YES;
+    
+    while(didSend && [_cmdCounter intValue] < [_cmdSequence count]){
+        // Start sending
+        NSLog(@"%@", [_cmdSequence objectAtIndex:[_cmdCounter integerValue]]);
+        
+        
+        // Get the data
+        self.dataToSend = [[NSString stringWithFormat: @"%@", [_cmdSequence objectAtIndex:[_cmdCounter integerValue]]] dataUsingEncoding:NSUTF8StringEncoding];
+        
+        // Reset the index
+        self.sendDataIndex = 0;
+        
+        
+        NSInteger amountToSend = self.dataToSend.length - self.sendDataIndex;
+        
+        // Can't be longer than 20 bytes
+        if (amountToSend > NOTIFY_MTU) amountToSend = NOTIFY_MTU;
+        
+        // Copy out the data we want
+        NSData *chunk = [NSData dataWithBytes:self.dataToSend.bytes+self.sendDataIndex length:amountToSend];
+        
+        // Send it
+        didSend = [self.peripheralManager updateValue:chunk forCharacteristic:self.transferCharacteristic onSubscribedCentrals:nil];
+        NSLog(didSend ? @"YES" : @"NO");
+        if(didSend){
+            _cmdCounter = @([_cmdCounter intValue] + 1);
+        }
+        [NSThread sleepForTimeInterval: 3.0];
+    }
+}
+
+-(void)declineOrder{
+    
+    BOOL didSend = YES;
+    
+    self.dataToSend = [[NSString stringWithFormat: @"Machine out of order"] dataUsingEncoding:NSUTF8StringEncoding];
+    
+    self.sendDataIndex = 0;
+    
+    NSInteger amountToSend = self.dataToSend.length - self.sendDataIndex;
+    
+    // Can't be longer than 20 bytes
+    if (amountToSend > NOTIFY_MTU) amountToSend = NOTIFY_MTU;
+    
+    // Copy out the data we want
+    NSData *chunk = [NSData dataWithBytes:self.dataToSend.bytes+self.sendDataIndex length:amountToSend];
+    
+    // Send it
+    didSend = [self.peripheralManager updateValue:chunk forCharacteristic:self.transferCharacteristic onSubscribedCentrals:nil];
+    NSLog(didSend ? @"YES" : @"NO");
+    //[NSThread sleepForTimeInterval: 5.0];
+}
+
 
 /** Recognise when the central unsubscribes
  */
@@ -223,8 +280,7 @@
     
     CBATTRequest*       request = [requests  objectAtIndex: 0];
     NSData*             request_data = request.value;
-    NSString *str = [NSString stringWithUTF8String:[request_data bytes]];
-    NSLog(str);
+    NSString *str = [[NSString alloc] initWithData:request_data encoding:NSUTF8StringEncoding ];
     CBCharacteristic*   write_char = request.characteristic;
     //CBCentral*            write_central = request.central;
     //NSUInteger            multi_message_offset = request.offset;
@@ -236,7 +292,37 @@
         // Read desired new_state data from central:
         unsigned char* new_state = (unsigned char*)[request_data   bytes];
         new_state = &new_state[0];
+        NSLog(@"%@ incoming", str);
         NSLog(@"        - advertise serno UUID: %s", new_state ? "TRUE" : "FALSE" );
+        
+        if ([str containsString:@"REQ"]) {
+            UIAlertController * alert=   [UIAlertController
+                                          alertControllerWithTitle:@"Incoming request"
+                                          message:@"Do I have enough sugar, water, milk powder?"
+                                          preferredStyle:UIAlertControllerStyleAlert];
+            
+            UIAlertAction* yesButton = [UIAlertAction
+                                        actionWithTitle:@"Yes"
+                                        style:UIAlertActionStyleDefault
+                                        handler:^(UIAlertAction * action)
+                                        {
+                                            _cmdCounter = 0;
+                                            [self dispenseCoffee];
+                                        }];
+            UIAlertAction* noButton = [UIAlertAction
+                                       actionWithTitle:@"No"
+                                       style:UIAlertActionStyleDefault
+                                       handler:^(UIAlertAction * action)
+                                       {
+                                           //Handel no, thanks button
+                                           [self declineOrder];
+                                       }];
+            
+            [alert addAction:yesButton];
+            [alert addAction:noButton];
+            
+            [self presentViewController:alert animated:YES completion:nil];
+        }
         
         // Select UUID that includes serno of PWR RX, for advertisements:
         
@@ -251,6 +337,17 @@
 //    {
 //        NSLog(@"_no_write_request_FAULT !!");
 //    }
+}
+
+
+/** This callback comes in when the PeripheralManager is ready to send the next chunk of data.
+ *  This is to ensure that packets will arrive in the order they are sent
+ */
+- (void)peripheralManagerIsReadyToUpdateSubscribers:(CBPeripheralManager *)peripheral
+{
+    // Start sending again
+    [self sendCustomData];
+    [self dispenseCoffee];
 }
 
 

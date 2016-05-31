@@ -12,5 +12,9 @@
 
 @property (weak, nonatomic) IBOutlet UISwitch *switchOutlet;
 - (IBAction)switchAction:(id)sender;
+@property(nonatomic, retain) NSArray *myArray;
+@property(nonatomic, retain) NSArray *cmdSequence;
+@property(nonatomic, retain) NSNumber *counter;
+@property(nonatomic, retain) NSNumber *cmdCounter;
 
 @end
